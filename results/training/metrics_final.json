@@ -1,0 +1,26 @@
+{
+  "model": "YOLOv8n fine-tuned",
+  "dataset": "Simpang Uniland Medan",
+  "precision": 0.9568,
+  "recall": 0.6632,
+  "f1_score": 0.7834,
+  "mAP50": 0.6655,
+  "mAP50_95": 0.5666,
+  "ap_per_kelas": {
+    "motor": 0.735,
+    "mobil": 0.8972,
+    "bus": 0.395,
+    "truk": 0.635
+  },
+  "conf_threshold": 0.4,
+  "iou_threshold": 0.5,
+  "perbandingan_tugas1": {
+    "precision_t1": 0.734,
+    "recall_t1": 0.678,
+    "f1_t1": 0.703,
+    "precision_t2": 0.9568,
+    "recall_t2": 0.6632,
+    "f1_t2": 0.7834,
+    "delta_f1": 0.0804
+  }
+}

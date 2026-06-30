@@ -1,0 +1,20 @@
+# Video dan frame besar
+dataset/raw_videos/
+dataset/frames/
+dataset/auto_labeled/
+*.mp4
+*.avi
+*.mov
+
+# Model pretrained
+yolov8n.pt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.ipynb_checkpoints/
+*.tmp
+*.log

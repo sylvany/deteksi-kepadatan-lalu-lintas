@@ -1,0 +1,36 @@
+# Konfigurasi sistem deteksi kepadatan lalu lintas
+# Tugas 2 Visi Komputer — Universitas Mikroskil 2026
+# Kelompok: Silvani, Cindy, Gloria
+
+model:
+  weights: "models/best.pt"
+  confidence_threshold: 0.4
+  iou_threshold: 0.5
+  image_size: 640
+
+tracking:
+  tracker: "bytetrack.yaml"
+  track_buffer: 30
+
+counting:
+  line_position: 0.5
+
+density:
+  lengang:
+    min: 0
+    max: 10
+  lancar:
+    min: 11
+    max: 20
+  ramai:
+    min: 21
+    max: 35
+  padat:
+    min: 36
+    max: 9999
+
+classes:
+  0: "motor"
+  1: "mobil"
+  2: "bus"
+  3: "truk"

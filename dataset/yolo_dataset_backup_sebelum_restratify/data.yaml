@@ -1,0 +1,10 @@
+path: C:\Users\LENOVO\Downloads\traffic-detection\dataset\yolo_dataset
+train: images/train
+val: images/val
+test: images/test
+nc: 4
+names:
+- motor
+- mobil
+- bus
+- truk
