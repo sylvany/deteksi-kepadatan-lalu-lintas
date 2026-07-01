@@ -9,3 +9,6 @@ streamlit>=1.35.0
 PyYAML>=6.0
 labelImg
 imageio-ffmpeg>=0.6.0
+lapx>=0.5.10
+torch>=2.0.0
+torchvision>=0.15.0
