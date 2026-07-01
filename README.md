@@ -20,7 +20,7 @@
 >
 > Kelanjutan dari Tugas 1 (MOG2 + K-Means). Sistem deteksi, pelacakan, dan klasifikasi kepadatan lalu lintas menggunakan YOLOv8 hasil **transfer learning + fine-tuning** pada dataset Simpang Uniland Medan yang dikumpulkan dan dilabel secara mandiri, dipadukan dengan ByteTrack untuk penghitungan kendaraan unik.
 
-**🔗 [Akses Aplikasi Web](https://traffic-detection-app.streamlit.app/) &nbsp;|&nbsp; [Repositori GitHub](https://github.com/sylvany/traffic-detection)**
+**🔗 [Akses Aplikasi Web](https://deteksi-kepadatan-lalu-lintas.streamlit.app/) &nbsp;|&nbsp; [Repositori GitHub](https://github.com/sylvany/deteksi-kepadatan-lalu-lintas)**
 
 </div>
 
@@ -95,10 +95,10 @@ Evaluasi Model
       mAP@0.5 66.55% · mAP@0.5:0.95 56.66%
         │
         ▼
-┌──────────────────────────────────────────────────────┐
-│                  INFERENCE LOOP (per frame)            │
+┌──────────────────────────────────────────────────────────┐
+│                  INFERENCE LOOP (per frame)              │
 │                                                          │
-│  Object Detection (YOLOv8n fine-tuned)                  │
+│  Object Detection (YOLOv8n fine-tuned)                   │
 │         │                                                │
 │         ▼                                                │
 │  Vehicle Tracking (ByteTrack) → track ID per kendaraan   │
@@ -107,11 +107,11 @@ Evaluasi Model
 │  Vehicle Counting (Virtual Line Crossing)                │
 │         │                                                │
 │         ▼                                                │
-│  Klasifikasi Kepadatan (Rule-based + K-Means)             │
+│  Klasifikasi Kepadatan (Rule-based + K-Means)            │
 │         │                                                │
 │         ▼                                                │
-│  Temporal Smoothing (voting mayoritas 15 frame)           │
-└──────────────────────────────────────────────────────┘
+│  Temporal Smoothing (voting mayoritas 15 frame)          │
+└──────────────────────────────────────────────────────────┘
         │
         ▼
 Output: Video Beranotasi (H.264) · Grafik · CSV · JSON · Aplikasi Web
@@ -148,13 +148,13 @@ Fitur dinormalisasi dengan **StandardScaler** sebelum klasterisasi `k=4` (`n_ini
 traffic-detection/
 │
 ├── dataset/
-│   ├── raw_videos/              ← Video sumber 3 sesi (tidak di-commit)
+│   ├── raw_videos/              ← Video sumber 3 sesi 
 │   ├── frames/                  ← Hasil ekstraksi frame
 │   ├── auto_labeled/            ← Hasil auto-labeling + koreksi LabelImg
-│   └── yolo_dataset/             ← Dataset final (train/val/test + data.yaml)
+│   └── yolo_dataset/            ← Dataset final (train/val/test + data.yaml)
 │
 ├── models/
-│   └── best.pt                  ← Model hasil fine-tuning (download dari Drive)
+│   └── best.pt                  ← Model hasil fine-tuning
 │
 ├── src/
 │   ├── frame_extractor.py       ← Ekstraksi frame dari video
@@ -192,7 +192,7 @@ traffic-detection/
 
 **1. Clone repositori**
 ```bash
-git clone https://github.com/sylvany/traffic-detection.git
+git clone https://github.com/sylvany/https://github.com/sylvany/deteksi-kepadatan-lalu-lintas.git
 cd traffic-detection
 ```
 
@@ -210,21 +210,14 @@ source venv/bin/activate
 **3. Install dependensi**
 ```bash
 pip install -r requirements.txt
-pip install imageio-ffmpeg
 ```
 
-> `imageio-ffmpeg` membawa binary ffmpeg sendiri agar video hasil deteksi bisa langsung diputar di browser — tidak perlu instalasi ffmpeg terpisah ke sistem.
-
-**4. Download model**
-
-Unduh `best.pt` hasil fine-tuning dari Google Drive kelompok, letakkan di folder `models/`.
-
-**5. Jalankan aplikasi**
+**4. Jalankan aplikasi**
 ```bash
 streamlit run app.py
 ```
 
-Buka browser di `http://localhost:8501`. Atau akses langsung versi deploy di **[traffic-detection-app.streamlit.app](https://traffic-detection-app.streamlit.app/)** tanpa instalasi.
+Buka browser di `http://localhost:8501`. Atau akses langsung versi deploy di **[deteksi-kepadatan-lalu-lintas.streamlit.app](https://traffic-detection-app.streamlit.app/](https://deteksi-kepadatan-lalu-lintas.streamlit.app/)** tanpa instalasi.
 
 ---
 
@@ -289,8 +282,6 @@ python src/merge_dataset.py
 
 AP@0.5 per kelas: motor 73.5% · mobil 89.7% · bus 39.5% · truk 63.5%
 
-Detail lengkap dan analisis ada di `Laporan_Tugas2_VisiKomputer.md` BAB IV.
-
 ---
 
 ## ⚠️ Keterbatasan yang Diketahui
@@ -302,16 +293,6 @@ Detail lengkap dan analisis ada di `Laporan_Tugas2_VisiKomputer.md` BAB IV.
 
 ---
 
-## 🔭 Rencana Pengembangan
-
-- [ ] Penambahan data, khususnya kelas bus dan truk, untuk meningkatkan recall kelas minoritas
-- [ ] Augmentasi lanjutan (copy-paste, mixup) yang menyasar khusus kelas dengan instance sedikit
-- [ ] Eksplorasi YOLOv8s/m apabila ukuran dataset bertambah signifikan
-- [ ] Validasi pada lebih banyak lokasi persimpangan dan kondisi (malam hari, hujan)
-- [ ] Integrasi penyimpanan data jangka panjang untuk analisis pola lalu lintas historis
-
----
-
 <div align="center">
 
 **🚦 Traffic Detection System v2 — YOLOv8 Fine-tuned**
@@ -320,6 +301,6 @@ Tugas 2 — Visi Komputer | Universitas Mikroskil 2025/2026
 
 Silvani Chayadi · Cindy Nathania Perangin Angin · Gloria Apriyanti Siagian
 
-🔗 **[Live Demo](https://traffic-detection-app.streamlit.app/)** &nbsp;|&nbsp; **[Source Code](https://github.com/sylvany/traffic-detection)**
+🔗 **[Live Demo](https://deteksi-kepadatan-lalu-lintas.streamlit.app/)** &nbsp;|&nbsp; **[Source Code](https://github.com/sylvany/deteksi-kepadatan-lalu-lintas)**
 
 </div>
