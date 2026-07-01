@@ -1,186 +1,45 @@
 """
-visualizer.py
-Fungsi visualisasi: bounding box, garis counting, panel info.
+src/visualizer.py
 
-Kelompok: Silvani Chayadi, Cindy Nathania, Gloria Apriyanti
-Universitas Mikroskil 2026
+Overlay anotasi pada frame video:
+    - Bounding box berwarna per kelas kendaraan
+    - Track ID dan confidence di atas bbox
+    - Garis virtual counting (warna berubah saat kendaraan dekat)
+    - Panel info kiri-atas (status, count aktif, count total)
+    - Label status kepadatan kanan-atas
+
+Tugas 2 Visi Komputer — Universitas Mikroskil 2026
 """
 
+from typing import Dict, List, Optional
 import cv2
 import numpy as np
-from typing import List, Dict, Optional
-from src.detector import Deteksi
-from src.classifier import STATUS_INFO
+
+from src.detector import HasilDeteksi
 
 
-NAMA_KELAS = ["motor", "mobil", "bus", "truk"]
-
+# Warna per kelas (BGR)
 WARNA_KELAS = {
-    0: (0, 220, 0),
-    1: (255, 150, 0),
-    2: (0, 165, 255),
-    3: (0, 0, 220),
+    "motor": (0, 255, 0),      # hijau
+    "mobil": (255, 165, 0),    # biru-muda (BGR: oranye → ubah ke biru)
+    "bus":   (0, 128, 255),    # oranye-kebiruan
+    "truk":  (0, 0, 255),      # merah
 }
+# fallback
+WARNA_DEFAULT = (200, 200, 200)
 
-
-def gambar_deteksi(
-    frame: np.ndarray,
-    deteksi_list: List[Deteksi],
-    tampilkan_track_id: bool = True,
-    tampilkan_confidence: bool = False
-) -> np.ndarray:
-    """
-    Gambar bounding box + label untuk setiap kendaraan.
-    """
-    output = frame.copy()
-
-    for det in deteksi_list:
-        x1, y1, x2, y2 = det.bbox_int
-        warna = WARNA_KELAS.get(det.class_id, (180, 180, 180))
-
-        # Bounding box
-        cv2.rectangle(output, (x1, y1), (x2, y2), warna, 2)
-
-        # Susun label
-        if tampilkan_track_id and det.track_id is not None and det.track_id >= 0:
-            label = f"{det.class_name} #{det.track_id}"
-        else:
-            label = det.class_name
-
-        if tampilkan_confidence:
-            label += f" {det.confidence:.2f}"
-
-        # Background teks
-        (tw, th), _ = cv2.getTextSize(
-            label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1
-        )
-        cv2.rectangle(
-            output,
-            (x1, y1 - th - 6),
-            (x1 + tw + 4, y1),
-            warna, -1
-        )
-        cv2.putText(
-            output, label,
-            (x1 + 2, y1 - 4),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.45,
-            (0, 0, 0), 1, cv2.LINE_AA
-        )
-
-        # Titik centroid
-        cv2.circle(output, (int(det.cx), int(det.cy)), 3, warna, -1)
-
-    return output
-
-
-def gambar_garis_counting(
-    frame: np.ndarray,
-    line_y: int,
-    warna: tuple = (0, 255, 255),
-    tebal: int = 2
-) -> np.ndarray:
-    """
-    Gambar garis virtual counting horizontal.
-    """
-    output = frame.copy()
-    h, w   = output.shape[:2]
-
-    cv2.line(output, (0, line_y), (w, line_y), warna, tebal)
-    cv2.putText(
-        output, "COUNTING LINE",
-        (10, line_y - 8),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.45,
-        warna, 1, cv2.LINE_AA
-    )
-    return output
-
-
-def gambar_panel_info(
-    frame: np.ndarray,
-    status_rule: str,
-    count_aktif: int,
-    count_total: Dict[str, int],
-    frame_idx: int,
-    fps_proses: float,
-    status_kmeans: Optional[str] = None
-) -> np.ndarray:
-    """
-    Panel info semi-transparan di pojok kiri atas.
-    Menampilkan: status, jumlah kendaraan per kelas, FPS.
-    """
-    output  = frame.copy()
-    info    = STATUS_INFO.get(status_rule, STATUS_INFO["LANCAR"])
-    warna_s = info["warna_bgr"]
-
-    panel_h = 210
-    panel_w = 265
-
-    # Background semi-transparan
-    overlay = output.copy()
-    cv2.rectangle(overlay, (0, 0), (panel_w, panel_h), (15, 15, 15), -1)
-    cv2.addWeighted(overlay, 0.65, output, 0.35, 0, output)
-
-    # Status rule-based
-    cv2.rectangle(output, (8, 8), (panel_w - 8, 40), warna_s, -1)
-    cv2.putText(
-        output, info["label"],
-        (14, 31),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.65,
-        (0, 0, 0), 2, cv2.LINE_AA
-    )
-
-    # Status K-Means
-    if status_kmeans:
-        info_km = STATUS_INFO.get(status_kmeans, STATUS_INFO["LANCAR"])
-        cv2.putText(
-            output, f"K-Means: {info_km['label']}",
-            (10, 58),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.38,
-            (190, 190, 190), 1, cv2.LINE_AA
-        )
-
-    # Jumlah kendaraan aktif & total
-    cv2.putText(
-        output, f"Aktif  : {count_aktif} kendaraan",
-        (10, 76),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.43,
-        (255, 255, 255), 1, cv2.LINE_AA
-    )
-    cv2.putText(
-        output, f"Melintas: {count_total.get('total', 0)} total",
-        (10, 94),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.43,
-        (200, 200, 200), 1, cv2.LINE_AA
-    )
-
-    # Count per kelas
-    y = 114
-    for i, nama in enumerate(NAMA_KELAS):
-        jumlah  = count_total.get(nama, 0)
-        warna_k = WARNA_KELAS.get(i, (180, 180, 180))
-        cv2.circle(output, (16, y - 4), 5, warna_k, -1)
-        cv2.putText(
-            output, f"{nama:6s}: {jumlah}",
-            (26, y),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.4,
-            (210, 210, 210), 1, cv2.LINE_AA
-        )
-        y += 18
-
-    # Frame & FPS
-    cv2.putText(
-        output, f"Frame {frame_idx}  |  {fps_proses:.1f} fps",
-        (10, panel_h - 8),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.36,
-        (130, 130, 130), 1, cv2.LINE_AA
-    )
-
-    return output
+# Warna status (BGR)
+WARNA_STATUS = {
+    "LENGANG": (39, 174, 96),    # hijau
+    "LANCAR":  (52, 152, 219),   # biru
+    "RAMAI":   (230, 126, 34),   # oranye
+    "PADAT":   (231, 76, 60),    # merah
+}
 
 
 def buat_frame_lengkap(
     frame: np.ndarray,
-    deteksi_list: List[Deteksi],
+    deteksi_list: List[HasilDeteksi],
     line_y: int,
     status_rule: str,
     count_aktif: int,
@@ -188,16 +47,127 @@ def buat_frame_lengkap(
     frame_idx: int,
     fps_proses: float,
     status_kmeans: Optional[str] = None,
-    tampilkan_track_id: bool = True
+    tampilkan_track_id: bool = True,
 ) -> np.ndarray:
     """
-    Gabungkan semua layer anotasi menjadi satu frame.
-    Urutan: garis counting → bbox deteksi → panel info.
+    Gambarkan semua anotasi ke satu frame.
+
+    Args:
+        frame            : frame BGR asli (tidak dimodifikasi, di-copy dulu)
+        deteksi_list     : list HasilDeteksi dari VehicleDetector
+        line_y           : posisi garis counting (piksel y)
+        status_rule      : status rule-based ('LENGANG' dst)
+        count_aktif      : jumlah kendaraan aktif di frame ini
+        count_total      : dict count kumulatif {'total', 'motor', ...}
+        frame_idx        : nomor frame (untuk debug)
+        fps_proses       : FPS pemrosesan (untuk debug)
+        status_kmeans    : status K-Means (bisa None kalau belum fit)
+        tampilkan_track_id: tampilkan ID tracking di atas bbox
+
+    Returns:
+        np.ndarray: frame BGR beranotasi
     """
-    hasil = gambar_garis_counting(frame, line_y)
-    hasil = gambar_deteksi(hasil, deteksi_list, tampilkan_track_id)
-    hasil = gambar_panel_info(
-        hasil, status_rule, count_aktif,
-        count_total, frame_idx, fps_proses, status_kmeans
+    canvas = frame.copy()
+    h, w = canvas.shape[:2]
+
+    # ------------------------------------------------------------------ #
+    # 1. Bounding box + label per kendaraan                               #
+    # ------------------------------------------------------------------ #
+    for det in deteksi_list:
+        warna = WARNA_KELAS.get(det.class_name, WARNA_DEFAULT)
+        x1, y1, x2, y2 = det.x1, det.y1, det.x2, det.y2
+
+        # Kotak
+        cv2.rectangle(canvas, (x1, y1), (x2, y2), warna, 2)
+
+        # Label teks
+        if tampilkan_track_id and det.track_id is not None:
+            teks = f"#{det.track_id} {det.class_name} {det.confidence:.2f}"
+        else:
+            teks = f"{det.class_name} {det.confidence:.2f}"
+
+        (tw, th), _ = cv2.getTextSize(teks, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+        label_y = max(y1 - 4, th + 4)
+
+        cv2.rectangle(canvas, (x1, label_y - th - 4), (x1 + tw + 4, label_y), warna, -1)
+        cv2.putText(
+            canvas, teks,
+            (x1 + 2, label_y - 2),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+            (0, 0, 0), 1, cv2.LINE_AA,
+        )
+
+        # Titik tengah
+        cv2.circle(canvas, (det.cx, det.cy), 3, warna, -1)
+
+    # ------------------------------------------------------------------ #
+    # 2. Garis virtual counting                                           #
+    # ------------------------------------------------------------------ #
+    # Warna garis: merah kalau ada kendaraan dekat garis, kuning kalau tidak
+    dekat_garis = any(abs(det.cy - line_y) < 40 for det in deteksi_list)
+    warna_garis = (0, 0, 255) if dekat_garis else (0, 255, 255)
+
+    cv2.line(canvas, (0, line_y), (w, line_y), warna_garis, 2)
+    cv2.putText(
+        canvas, "COUNTING LINE",
+        (10, line_y - 8),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+        warna_garis, 1, cv2.LINE_AA,
     )
-    return hasil
+
+    # ------------------------------------------------------------------ #
+    # 3. Panel info kiri-atas (semi-transparan)                           #
+    # ------------------------------------------------------------------ #
+    panel_w, panel_h = 260, 170
+    overlay = canvas.copy()
+    cv2.rectangle(overlay, (8, 8), (8 + panel_w, 8 + panel_h), (20, 20, 20), -1)
+    cv2.addWeighted(overlay, 0.6, canvas, 0.4, 0, canvas)
+
+    baris_info = [
+        f"Frame  : {frame_idx}",
+        f"FPS    : {fps_proses:.1f}",
+        f"Aktif  : {count_aktif} kendaraan",
+        f"Total  : {count_total.get('total', 0)} kendaraan",
+        f"Motor  : {count_total.get('motor', 0)}  Mobil: {count_total.get('mobil', 0)}",
+        f"Bus    : {count_total.get('bus', 0)}  Truk : {count_total.get('truk', 0)}",
+    ]
+    for i, baris in enumerate(baris_info):
+        cv2.putText(
+            canvas, baris,
+            (14, 28 + i * 22),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.48,
+            (230, 230, 230), 1, cv2.LINE_AA,
+        )
+
+    # ------------------------------------------------------------------ #
+    # 4. Status kepadatan kanan-atas                                      #
+    # ------------------------------------------------------------------ #
+    warna_s = WARNA_STATUS.get(status_rule, (180, 180, 180))
+
+    label_rule = f"RULE: {status_rule}"
+    (rw, rh), _ = cv2.getTextSize(label_rule, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+    rx = w - rw - 14
+
+    cv2.rectangle(canvas, (rx - 6, 8), (w - 6, 8 + rh + 10), (20, 20, 20), -1)
+    cv2.putText(
+        canvas, label_rule,
+        (rx, 8 + rh + 2),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+        warna_s, 2, cv2.LINE_AA,
+    )
+
+    # Tampilkan K-Means status kalau ada
+    if status_kmeans:
+        warna_km = WARNA_STATUS.get(status_kmeans, (180, 180, 180))
+        label_km = f"KM  : {status_kmeans}"
+        (kmw, kmh), _ = cv2.getTextSize(label_km, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+        kmx = w - kmw - 14
+
+        cv2.putText(
+            canvas, label_km,
+            (kmx, 8 + rh + 10 + kmh + 6),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.55,
+            warna_km, 1, cv2.LINE_AA,
+        )
+
+    return canvas
