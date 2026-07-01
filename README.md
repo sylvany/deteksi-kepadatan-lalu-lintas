@@ -1,9 +1,8 @@
-<div align="center">
-        
-  #      🚦 Sistem Deteksi & Pelacakan Kepadatan Lalu Lintas Berbasis Deep Learning
 
-<div>
         
+  #      🚦 Sistem Deteksi Kepadatan Lalu Lintas Berbasis Deep Learning
+
+       
 <div align="center">
 
 **YOLOv8 (Transfer Learning + Fine-tuning) · ByteTrack · K-Means Clustering**
