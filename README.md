@@ -1,5 +1,9 @@
-# 🚦 Sistem Deteksi & Pelacakan Kepadatan Lalu Lintas Berbasis Deep Learning
+<div align="center">
+        
+  #      🚦 Sistem Deteksi & Pelacakan Kepadatan Lalu Lintas Berbasis Deep Learning
 
+<div>
+        
 <div align="center">
 
 **YOLOv8 (Transfer Learning + Fine-tuning) · ByteTrack · K-Means Clustering**
@@ -32,7 +36,7 @@ Sistem ini adalah pengembangan dari Tugas 1, di mana pendekatan klasik MOG2 + K-
 
 Setiap kendaraan yang terdeteksi dilacak lintas frame menggunakan **ByteTrack**, diberikan identitas unik (track ID), lalu dihitung secara akurat melalui metode **virtual line crossing** — setiap kendaraan hanya dihitung satu kali, mengatasi keterbatasan counting per-frame pada Tugas 1. Status kepadatan lalu lintas diklasifikasikan menggunakan dua metode paralel (rule-based dan K-Means Clustering) dan distabilkan melalui **temporal smoothing** agar tidak berubah-ubah cepat antar frame.
 
-**Lokasi pengujian:** Simpang Jalan MT. Haryono (Simpang Uniland), Kota Medan, Sumatera Utara — lokasi yang sama dengan Tugas 1.
+**Lokasi pengujian:** Simpang Jalan MT. Haryono (Simpang Uniland), Kota Medan, Sumatera Utara, lokasi yang sama dengan Tugas 1.
 
 **Data pengujian:** Tiga sesi rekaman video berdurasi 60 detik pada pukul **09.00**, **12.00**, dan **17.00 WIB**.
 
