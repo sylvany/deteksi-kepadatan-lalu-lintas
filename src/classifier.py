@@ -1,86 +1,69 @@
 """
-classifier.py
-Klasifikasi kepadatan lalu lintas.
+src/classifier.py
 
-Dua metode dijalankan paralel — sama seperti Tugas 1
-tapi input dari YOLO jauh lebih akurat:
+Klasifikasi kepadatan lalu lintas dua jalur:
+    1. Rule-based  — threshold jumlah kendaraan aktif per frame
+    2. K-Means     — clustering fitur (count, density_pct, avg_area)
 
-  1. Rule-based : threshold dari config.yaml
-                  cepat, deterministik, mudah dikonfigurasi
-  2. K-Means    : clustering fitur multi-dimensi
-                  sama persis dengan Tugas 1 untuk kontinuitas
-                  input lebih akurat karena tidak ada contour merging
+Keduanya dijalankan paralel untuk validasi silang,
+konsisten dengan metodologi Tugas 1.
 
-Kelompok: Silvani Chayadi, Cindy Nathania, Gloria Apriyanti
-Universitas Mikroskil 2026
+Tugas 2 Visi Komputer — Universitas Mikroskil 2026
 """
 
+from typing import Dict, List, Optional, Tuple
 import numpy as np
-from typing import List, Dict, Tuple, Optional
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
 
 
-# Info tampilan per status
-STATUS_INFO = {
-    "LENGANG": {
-        "label":     "🟢 LENGANG",
-        "warna_bgr": (0, 200, 0),
-        "warna_hex": "#2ECC71"
-    },
-    "LANCAR": {
-        "label":     "🟡 LANCAR",
-        "warna_bgr": (0, 200, 200),
-        "warna_hex": "#F1C40F"
-    },
-    "RAMAI": {
-        "label":     "🟠 RAMAI",
-        "warna_bgr": (0, 130, 255),
-        "warna_hex": "#E67E22"
-    },
-    "PADAT": {
-        "label":     "🔴 PADAT",
-        "warna_bgr": (0, 0, 220),
-        "warna_hex": "#E74C3C"
-    },
-}
-
-STATUS_URUTAN = ["LENGANG", "LANCAR", "RAMAI", "PADAT"]
+# Label cluster → status (ditetapkan setelah fitting berdasarkan centroid count)
+_LABEL_STATUS = ["LENGANG", "LANCAR", "RAMAI", "PADAT"]
 
 
 class DensityClassifier:
     """
-    Klasifikasi kepadatan lalu lintas.
+    Klasifier kepadatan lalu lintas.
+
+    Params:
+        thresholds : dict threshold per kategori, misalnya:
+                     {
+                       'lengang': {'max': 10},
+                       'lancar':  {'max': 20},
+                       'ramai':   {'max': 35},
+                       'padat':   {'max': 9999},
+                     }
+        n_clusters : jumlah kluster K-Means (default 4)
     """
 
-    def __init__(self, thresholds: dict):
-        """
-        Args:
-            thresholds : dict dari config.yaml
-                         {"lengang": {"max": 10}, "lancar": {"max": 20}, ...}
-        """
-        self.thresholds = thresholds
+    def __init__(self, thresholds: Optional[Dict] = None, n_clusters: int = 4):
+        self.thresholds = thresholds or {
+            "lengang": {"max": 10},
+            "lancar":  {"max": 20},
+            "ramai":   {"max": 35},
+            "padat":   {"max": 9999},
+        }
+        self.n_clusters = n_clusters
 
-        # Buffer fitur untuk K-Means [count, density_pct, avg_area]
-        # Buffer ini TERUS BERTAMBAH setiap frame, dipakai sebagai
-        # riwayat data untuk fit ulang berkala
-        self._buffer: List[List[float]] = []
+        # Buffer fitur untuk K-Means (dikumpulkan sepanjang video)
+        self._fitur_buffer: List[List[float]] = []
 
-        self._kmeans: Optional[KMeans]        = None
-        self._scaler: Optional[StandardScaler] = None
-        self._kmeans_ready                     = False
+        # Model K-Means (difit di akhir)
+        self._kmeans = None
+        self._scaler = None
+        self._label_map: Dict[int, str] = {}
 
-        self._buffer_saat_fit: Optional[np.ndarray] = None
+    # ------------------------------------------------------------------ #
+    # Rule-based                                                           #
+    # ------------------------------------------------------------------ #
 
     def klasifikasi_rule_based(self, count_aktif: int) -> str:
         """
-        Klasifikasi berdasarkan threshold dari config.
+        Klasifikasikan status berdasarkan jumlah kendaraan aktif.
 
         Args:
-            count_aktif : jumlah kendaraan terlihat di frame ini
+            count_aktif: jumlah kendaraan terdeteksi di frame saat ini
 
         Returns:
-            str: "LENGANG" / "LANCAR" / "RAMAI" / "PADAT"
+            str: 'LENGANG' | 'LANCAR' | 'RAMAI' | 'PADAT'
         """
         t = self.thresholds
         if count_aktif <= t["lengang"]["max"]:
@@ -92,144 +75,122 @@ class DensityClassifier:
         else:
             return "PADAT"
 
+    # ------------------------------------------------------------------ #
+    # K-Means                                                              #
+    # ------------------------------------------------------------------ #
+
     def tambah_fitur(
         self,
-        count: int,
+        count_aktif: int,
         density_ratio: float,
-        avg_box_area: float
+        avg_area: float,
     ):
         """
-        Tambah fitur frame ini ke buffer K-Means.
+        Tambahkan satu baris fitur ke buffer untuk K-Means.
 
-        Fitur sama dengan Tugas 1:
-          count        : jumlah kendaraan aktif
-          density_pct  : rasio area bbox / area frame x 100
-          avg_box_area : rata-rata luas bbox kendaraan
+        Dipanggil setiap frame selama pemrosesan video.
 
-        Fit ulang K-Means setiap 50 frame terkumpul.
+        Args:
+            count_aktif  : jumlah kendaraan aktif di frame
+            density_ratio: rasio total area bbox / area frame (0–1)
+            avg_area     : rata-rata luas bbox per kendaraan (piksel²)
         """
-        self._buffer.append([count, density_ratio * 100, avg_box_area])
-
-        if len(self._buffer) >= 50 and len(self._buffer) % 50 == 0:
-            self._fit_kmeans()
-
-    def _fit_kmeans(self):
-        """
-        Fit KMeans dengan SELURUH data buffer saat ini, lalu simpan
-        snapshot-nya agar konsisten dengan self._kmeans.labels_.
-        """
-        if len(self._buffer) < 4:
-            return
-
-        # Ambil snapshot PERSIS saat ini -> akan dipakai konsisten
-        # bersamaan dengan self._kmeans.labels_ yang dihasilkan
-        X = np.array(self._buffer)
-
-        self._scaler = StandardScaler()
-        X_scaled = self._scaler.fit_transform(X)
-
-        self._kmeans = KMeans(
-            n_clusters   = 4,
-            n_init       = 15,
-            random_state = 42
-        )
-        self._kmeans.fit(X_scaled)
-        self._kmeans_ready = True
-
-        self._buffer_saat_fit = X
+        self._fitur_buffer.append([
+            float(count_aktif),
+            float(density_ratio * 100),   # ubah ke persen agar skalanya serasi
+            float(avg_area),
+        ])
 
     def klasifikasi_kmeans(
         self,
-        count: int,
+        count_aktif: int,
         density_ratio: float,
-        avg_box_area: float
-    ) -> Tuple[str, float]:
+        avg_area: float,
+    ) -> Tuple[Optional[str], Optional[int]]:
         """
-        Klasifikasi K-Means untuk frame saat ini.
+        Klasifikasikan satu frame dengan model K-Means yang sudah difit.
+
+        Kalau model belum difit (terlalu sedikit data), return (None, None).
 
         Returns:
-            tuple: (status, confidence_proxy)
-                   confidence adalah 1 - jarak_ke_centroid (proxy)
+            (status_str, cluster_id) atau (None, None)
         """
-        if not self._kmeans_ready or self._buffer_saat_fit is None:
-            return self.klasifikasi_rule_based(count), 0.0
+        if self._kmeans is None or self._scaler is None:
+            return None, None
 
-        fitur        = np.array([[count, density_ratio * 100, avg_box_area]])
-        fitur_scaled = self._scaler.transform(fitur)
+        fitur = np.array([[
+            float(count_aktif),
+            float(density_ratio * 100),
+            float(avg_area),
+        ]])
 
-        cluster_id = int(self._kmeans.predict(fitur_scaled)[0])
+        try:
+            fitur_scaled = self._scaler.transform(fitur)
+            cluster_id = int(self._kmeans.predict(fitur_scaled)[0])
+            status = self._label_map.get(cluster_id, "LENGANG")
+            return status, cluster_id
+        except Exception:
+            return None, None
 
-        labels_arr = self._kmeans.labels_
-        buffer_arr = self._buffer_saat_fit
-
-        # Map cluster ke status berdasarkan urutan rata-rata count
-        centroid_counts = []
-        for k in range(4):
-            mask = labels_arr == k
-            # mask dan buffer_arr sekarang DIJAMIN ukurannya sama
-            mean_count = buffer_arr[mask, 0].mean() if mask.sum() > 0 else 0
-            centroid_counts.append((k, mean_count))
-
-        centroid_counts.sort(key=lambda x: x[1])
-        cluster_ke_status = {
-            k: STATUS_URUTAN[i]
-            for i, (k, _) in enumerate(centroid_counts)
-        }
-
-        status = cluster_ke_status.get(cluster_id, "LANCAR")
-
-        # Hitung jarak ke centroid sebagai proxy confidence
-        jarak      = self._kmeans.transform(fitur_scaled)[0][cluster_id]
-        confidence = max(0.0, 1.0 - jarak / 10.0)
-
-        return status, confidence
-
-    def fit_akhir(self) -> dict:
+    def fit_akhir(self) -> Dict:
         """
-        Fit K-Means final setelah seluruh video selesai.
-        Hitung Silhouette Score dan Davies-Bouldin Index.
+        Fit K-Means pada seluruh buffer fitur yang terkumpul.
+
+        Dipanggil setelah seluruh frame selesai diproses.
 
         Returns:
-            dict metrik kualitas klasterisasi
+            dict metrik evaluasi K-Means
         """
-        if len(self._buffer) < 8:
-            return {"error": "Data tidak cukup untuk K-Means"}
-
+        from sklearn.cluster import KMeans
+        from sklearn.preprocessing import StandardScaler
         from sklearn.metrics import silhouette_score, davies_bouldin_score
 
-        X = np.array(self._buffer)
-        self._scaler = StandardScaler()
-        X_scaled     = self._scaler.fit_transform(X)
+        buf = self._fitur_buffer
+        if len(buf) < self.n_clusters * 3:
+            return {}
 
-        self._kmeans = KMeans(
-            n_clusters   = 4,
-            n_init       = 15,
-            random_state = 42
+        X = np.array(buf, dtype=np.float32)
+
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+
+        km = KMeans(
+            n_clusters=self.n_clusters,
+            n_init=15,
+            random_state=42,
         )
-        labels = self._kmeans.fit_predict(X_scaled)
-        self._kmeans_ready = True
+        labels = km.fit_predict(X_scaled)
 
-        self._buffer_saat_fit = X
+        self._scaler = scaler
+        self._kmeans = km
 
-        sil = silhouette_score(X_scaled, labels) if len(set(labels)) > 1 else 0.0
-        dbi = davies_bouldin_score(X_scaled, labels) if len(set(labels)) > 1 else 0.0
-
-        unique, counts = np.unique(labels, return_counts=True)
-
-        metrik = {
-            "silhouette_score":     float(sil),
-            "davies_bouldin_index": float(dbi),
-            "total_frame":          len(self._buffer),
-            "distribusi_klaster":   dict(zip(unique.tolist(), counts.tolist()))
+        # Petakan kluster → status berdasarkan urutan centroid count_aktif
+        centroid_count = km.cluster_centers_[:, 0]  # fitur pertama = count
+        urutan = np.argsort(centroid_count)  # kluster dari paling sepi ke padat
+        status_list = ["LENGANG", "LANCAR", "RAMAI", "PADAT"]
+        self._label_map = {
+            int(urutan[i]): status_list[i]
+            for i in range(min(len(urutan), len(status_list)))
         }
 
-        print(f"\n  K-Means Final (k=4):")
-        print(f"  Silhouette Score : {sil:.4f} (mendekati 1 = bagus)")
-        print(f"  Davies-Bouldin   : {dbi:.4f} (mendekati 0 = bagus)")
-        print(f"  Total frame      : {len(self._buffer)}")
+        # Hitung metrik evaluasi
+        metrik = {"total_frame": len(buf)}
+        try:
+            if len(set(labels)) >= 2:
+                metrik["silhouette_score"] = float(
+                    silhouette_score(X_scaled, labels)
+                )
+                metrik["davies_bouldin_index"] = float(
+                    davies_bouldin_score(X_scaled, labels)
+                )
+        except Exception:
+            pass
 
         return metrik
 
-    def get_status_info(self, status: str) -> dict:
-        """Ambil info tampilan (label, warna) untuk status tertentu."""
-        return STATUS_INFO.get(status, STATUS_INFO["LANCAR"])
+    def reset(self):
+        """Reset buffer dan model (untuk video baru)."""
+        self._fitur_buffer.clear()
+        self._kmeans = None
+        self._scaler = None
+        self._label_map = {}
