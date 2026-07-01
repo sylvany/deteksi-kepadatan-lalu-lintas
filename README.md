@@ -217,7 +217,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Buka browser di `http://localhost:8501`. Atau akses langsung versi deploy di **[deteksi-kepadatan-lalu-lintas.streamlit.app](https://traffic-detection-app.streamlit.app/](https://deteksi-kepadatan-lalu-lintas.streamlit.app/)** tanpa instalasi.
+Buka browser di `http://localhost:8501`. Atau akses langsung versi deploy di **[deteksi-kepadatan-lalu-lintas.streamlit.app](https://deteksi-kepadatan-lalu-lintas.streamlit.app/)** tanpa instalasi.
 
 ---
 
