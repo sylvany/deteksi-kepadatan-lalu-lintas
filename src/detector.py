@@ -122,7 +122,7 @@ class VehicleDetector:
         """
         Deteksi + tracking ByteTrack dalam satu panggilan.
 
-        ByteTrack (Zhang et al., 2022):
+        ByteTrack:
           - Mengasosiasikan bbox antar frame menggunakan IoU
           - Setiap kendaraan mendapat track_id unik yang konsisten
           - Deteksi confidence rendah tetap dimanfaatkan untuk
