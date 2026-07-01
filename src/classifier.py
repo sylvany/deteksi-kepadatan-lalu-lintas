@@ -70,12 +70,6 @@ class DensityClassifier:
         self._scaler: Optional[StandardScaler] = None
         self._kmeans_ready                     = False
 
-        # ── FIX: snapshot data yang dipakai SAAT fit terakhir ──
-        # self._kmeans.labels_ punya ukuran tetap sesuai jumlah baris
-        # buffer SAAT fit dipanggil. Jika kita pakai self._buffer yang
-        # sudah bertambah panjang untuk masking, ukurannya tidak akan
-        # cocok dengan labels_ -> IndexError.
-        # Solusi: simpan array buffer persis seperti saat fit dipanggil.
         self._buffer_saat_fit: Optional[np.ndarray] = None
 
     def klasifikasi_rule_based(self, count_aktif: int) -> str:
@@ -142,10 +136,6 @@ class DensityClassifier:
         self._kmeans.fit(X_scaled)
         self._kmeans_ready = True
 
-        # ── FIX: simpan snapshot buffer yang dipakai saat fit ──
-        # Ini WAJIB disimpan terpisah karena self._buffer akan terus
-        # bertambah panjang di frame-frame berikutnya, sementara
-        # self._kmeans.labels_ ukurannya tetap sesuai X di atas.
         self._buffer_saat_fit = X
 
     def klasifikasi_kmeans(
@@ -169,8 +159,6 @@ class DensityClassifier:
 
         cluster_id = int(self._kmeans.predict(fitur_scaled)[0])
 
-        # ── FIX: gunakan self._buffer_saat_fit (BUKAN self._buffer) ──
-        # agar ukurannya selalu sama dengan self._kmeans.labels_
         labels_arr = self._kmeans.labels_
         buffer_arr = self._buffer_saat_fit
 
@@ -221,7 +209,6 @@ class DensityClassifier:
         labels = self._kmeans.fit_predict(X_scaled)
         self._kmeans_ready = True
 
-        # ── FIX: update snapshot juga di sini ──
         self._buffer_saat_fit = X
 
         sil = silhouette_score(X_scaled, labels) if len(set(labels)) > 1 else 0.0
